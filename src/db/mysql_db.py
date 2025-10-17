@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
 from urllib.parse import urlparse, parse_qs
 
+import pandas as pd
 from pymysql import connect
 from pymysql.connections import Connection
-from pymysql.cursors import Cursor, DictCursor
+from pymysql.cursors import Cursor, SSCursor
 
 from db.db import DB
 
@@ -72,7 +74,7 @@ class MysqlDB(DB):
             database=self._dbname,
             port=self._port,
             charset=self._charset,
-            cursorclass=DictCursor
+            cursorclass=SSCursor
         )
         cursor = connection.cursor()
         return connection, cursor
@@ -92,3 +94,125 @@ class MysqlDB(DB):
     @property
     def cursor(self) -> Cursor:
         return self._cursor
+
+    def query(
+            self,
+            sql: str,
+            param: tuple[Any, ...] | dict[str, Any] | None = None,
+            connection_cursor: tuple[Connection, Cursor] | None = None,
+            use_new_connect: bool = False,
+            return_df: bool = False
+    ) -> list[dict[str, Any]] | pd.DataFrame:
+        if connection_cursor is not None:
+            connection, cursor = connection_cursor
+        else:
+            if use_new_connect:
+                connection_cursor = self.open_connect()
+                connection, cursor = connection_cursor
+            else:
+                connection, cursor = self._connection, self._cursor
+
+        cursor.execute(sql, param)
+        result = cursor.fetchall()
+
+        columns = [i[0] for i in cursor.description]
+        rows = [dict(zip(columns, i)) for i in result]
+
+        if connection_cursor is not None:
+            self.close_connect(*connection_cursor)
+
+        if return_df:
+            return pd.DataFrame(rows)
+
+        return rows
+
+    def execute(
+            self,
+            sql: str,
+            param: tuple[Any, ...] | dict[str, Any] | None = None,
+            connection_cursor: tuple[Connection, Cursor] | None = None,
+            use_new_connect: bool = False
+    ) -> int:
+        """
+        # tuple[Any, ...]
+        mysql_db.execute("SELECT * FROM users WHERE id=%s AND name=%s;", (1, "Alice"))
+
+        # dict[str, Any]
+        mysql_db.execute("INSERT INTO users (name, age) VALUES (%(name)s, %(age)s);", {"name": "Bob", "age": 25})
+
+        # None
+        mysql_db.execute("DELETE FROM users WHERE id=10;")
+
+
+        Args:
+            sql:
+            param:
+            connection_cursor:
+            use_new_connect:
+
+        Returns:
+
+        """
+        if connection_cursor is not None:
+            connection, cursor = connection_cursor
+        else:
+            if use_new_connect:
+                connection_cursor = self.open_connect()
+                connection, cursor = connection_cursor
+            else:
+                connection, cursor = self._connection, self._cursor
+
+        affected_rows = cursor.execute(sql, param)
+        connection.commit()
+
+        if connection_cursor is not None:
+            self.close_connect(*connection_cursor)
+
+        return affected_rows
+
+    def executemany(
+            self,
+            sql: str,
+            params: list[tuple[Any, ...]] | list[dict[str, Any]],
+            connection_cursor: tuple[Connection, Cursor] | None = None,
+            use_new_connect: bool = False
+    ) -> int:
+        """
+        # list[tuple[Any, ...]]
+        cursor.executemany(
+            "INSERT INTO users (name, age) VALUES (%s, %s);",
+            [("Alice", 20), ("Bob", 25)]
+        )
+
+        # list[dict[str, Any]]
+        cursor.executemany(
+            "INSERT INTO users (name, age) VALUES (%(name)s, %(age)s);",
+            [{"name": "Alice", "age": 20}, {"name": "Bob", "age": 25}]
+        )
+
+
+        Args:
+            sql:
+            params:
+            connection_cursor:
+            use_new_connect:
+
+        Returns:
+
+        """
+        if connection_cursor is not None:
+            connection, cursor = connection_cursor
+        else:
+            if use_new_connect:
+                connection_cursor = self.open_connect()
+                connection, cursor = connection_cursor
+            else:
+                connection, cursor = self._connection, self._cursor
+
+        affected_rows = cursor.executemany(sql, params)
+        connection.commit()
+
+        if connection_cursor is not None:
+            self.close_connect(*connection_cursor)
+
+        return affected_rows
