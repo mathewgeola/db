@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlparse, parse_qs
 
 import pandas as pd
+from furl import furl
 from pymysql import connect
 from pymysql.connections import Connection
 from pymysql.cursors import Cursor, SSCursor
@@ -14,6 +14,7 @@ from db.db import DB
 class MysqlDB(DB):
     """
     import db
+
 
     mysql_db = db.MysqlDB.from_uri("mysql+pymysql://root:root@127.0.0.1:3306/db?charset=utf8mb4")
 
@@ -35,7 +36,7 @@ class MysqlDB(DB):
             password: str = "",
             dbname: str | None = None,
             charset: str = "utf8mb4"
-    ):
+    ) -> None:
         self._host = host
         self._port = port
         self._username = username
@@ -51,20 +52,6 @@ class MysqlDB(DB):
 
     def _close(self) -> None:
         self.close_connect(self._connection, self._cursor)
-
-    @classmethod
-    def from_uri(cls, uri: str) -> MysqlDB:
-        parsed = urlparse(uri)
-        return cls(
-            **dict(
-                host=parsed.hostname,
-                port=parsed.port,
-                username=parsed.username,
-                password=parsed.password,
-                dbname=parsed.path.lstrip("/"),
-                charset=parse_qs(parsed.query).get("charset", ["utf8mb4"])[0]
-            )
-        )
 
     def open_connect(self) -> tuple[Connection, Cursor]:
         connection = connect(
@@ -86,6 +73,18 @@ class MysqlDB(DB):
 
         if connection is not None:
             connection.close()
+
+    @classmethod
+    def from_uri(cls, uri: str) -> MysqlDB:
+        f = furl(uri)
+        return cls(
+            host=f.host,
+            port=int(f.port),
+            username=f.username,
+            password=f.password,
+            dbname=f.path.segments[0],
+            charset=f.query.params.get("charset", "utf8mb4")
+        )
 
     @property
     def connection(self) -> Connection:
@@ -179,13 +178,13 @@ class MysqlDB(DB):
     ) -> int:
         """
         # list[tuple[Any, ...]]
-        cursor.executemany(
+        mysql_db.executemany(
             "INSERT INTO users (name, age) VALUES (%s, %s);",
             [("Alice", 20), ("Bob", 25)]
         )
 
         # list[dict[str, Any]]
-        cursor.executemany(
+        mysql_db.executemany(
             "INSERT INTO users (name, age) VALUES (%(name)s, %(age)s);",
             [{"name": "Alice", "age": 20}, {"name": "Bob", "age": 25}]
         )
