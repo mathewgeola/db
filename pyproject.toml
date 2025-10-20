@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "wb-db"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["mathewgeola <mathewgeola@gmail.com>"]
 readme = "README.md"
 
@@ -15,6 +15,7 @@ pandas = "^2.3.3"
 openpyxl = "^3.1.5"
 redis = "^6.4.0"
 furl = "^2.1.4"
+pymongo = "^4.15.3"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
