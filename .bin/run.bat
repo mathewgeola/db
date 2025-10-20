@@ -1,6 +1,8 @@
 @echo off
 
-set VERSION=0.0.4
+set /p VERSION=<../VERSION
+
+for /f "tokens=* delims= " %%a in ("%VERSION%") do set VERSION=%%a
 
 poetry version %VERSION%
 
